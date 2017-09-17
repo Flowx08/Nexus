@@ -2,6 +2,4 @@
 Botnet with web terminal, written in javascript, php and visual basic
 
 # Screenshot
-
-# Hot to use
-
+![alt text](https://raw.githubusercontent.com/Flowx08/Nexus/master/screenshot.png "screenshot 1")
